@@ -1,0 +1,24 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^(?!http).*"
+    },
+    {
+      "pattern": "!\\[.*\\]\\((?!http).*\\)"
+    },
+    {
+      "pattern": "^https:\\/\\/github\\.com\\/apache\\/hertzbeat\\/pull\\/.*"
+    }
+  ],
+  "timeout": "10s",
+  "retryOn429": true,
+  "retryCount": 10,
+  "fallbackRetryDelay": "1000s",
+  "aliveStatusCodes": [
+    0,
+    200,
+    400,
+    401,
+    403
+  ]
+}

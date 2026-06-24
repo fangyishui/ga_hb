@@ -1,0 +1,34 @@
+.hero--primary {
+    --ifm-hero-background-color: #fff;
+    --ifm-hero-text-color: #000;
+}
+
+html[data-theme=dark] .hero--primary {
+    --ifm-hero-background-color: #0c0c0c;
+    --ifm-hero-text-color: #fff;
+}
+
+.hero__title {
+    background-size: 110%;
+    color: transparent;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    height: 280px;
+}
+
+.hero__subtitle {
+    font-size: 3em;
+    font-weight: bolder;
+    font-family: monospace;
+    color: #d97700;
+    width: 100%;
+    margin: 0 auto;
+}
+
+@media (max-width: 400px) {
+    .hero__subtitle {
+        font-size: 1.3em;
+        font-weight: bolder;
+    }
+}

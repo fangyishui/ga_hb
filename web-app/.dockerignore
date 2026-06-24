@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.gitignore
+*.md
+.env*
+.vscode
+.idea
+*.log
+coverage
+.eslintrc.js
+.prettierrc.js
+.stylelintrc
+.browserslistrc
+.editorconfig

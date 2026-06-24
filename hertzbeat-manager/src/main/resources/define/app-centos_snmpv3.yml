@@ -1,0 +1,383 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The monitoring type category：service-application service monitoring db-database monitoring custom-custom monitoring os-operating system monitoring
+category: custom
+# The monitoring type eg: linux windows tomcat mysql aws...
+app: centos_snmpv3
+# The monitoring i18n name
+name:
+  zh-CN: Centos Linux(SNMP)
+  en-US: Centos Linux(SNMP)
+  ja-JP: Centos Linux(SNMP)
+# The description and help of this monitoring type
+help:
+  zh-CN: HertzBeat 使用 <a class='help_module_content' href='https://hertzbeat.apache.org/docs/advanced/extend-snmp'> SNMP 协议</a> 对 Centos 操作系统的通用性能指标（系统信息、CPU、内存）进行采集监控。支持 SNMPv1/v2c/v3 版本。
+  en-US: HertzBeat uses <a class='help_module_content' href='https://hertzbeat.apache.org/docs/advanced/extend-snmp'> SNMP protocol</a> to monitor Centos operating system's general performance metrics such as system info, CPU, memory. Support SNMPv1/v2c/v3.
+  ja-JP: Hertzbeat は <a class='help_module_content' href='https://hertzbeat.apache.org/docs/advanced/extend-snmp'> SNMPプロトコル</a> を使用してCentosシステムの一般的なパフォーマンスメトリクスを監視します。SNMPv1/v2c/v3に対応。
+helpLink:
+  zh-CN: https://hertzbeat.apache.org/zh-cn/docs/help/centos/
+  en-US: https://hertzbeat.apache.org/docs/help/centos/
+# Input params define for monitoring(render web ui by the definition)
+params:
+  - field: host
+    name:
+      zh-CN: 目标Host
+      en-US: Target Host
+      ja-JP: 目標ホスト
+    type: host
+    required: true
+  - field: port
+    name:
+      zh-CN: 端口
+      en-US: Port
+      ja-JP: ポート
+    type: number
+    range: '[0,65535]'
+    required: true
+    defaultValue: 161
+  - field: timeout
+    name:
+      zh-CN: 超时时间(ms)
+      en-US: Timeout(ms)
+      ja-JP: タイムアウト（ｍｓ）
+    type: number
+    range: '[0,100000]'
+    required: false
+    defaultValue: 6000
+  # === SNMP 参数 ===
+  - field: snmpVersion
+    name:
+      zh-CN: SNMP 版本
+      en-US: SNMP Version
+      ja-JP: SNMPバージョン
+    type: radio
+    required: true
+    options:
+      - label: SNMPv1
+        value: 0
+      - label: SNMPv2c
+        value: 1
+      - label: SNMPv3
+        value: 3
+  - field: community
+    name:
+      zh-CN: SNMP 团体字
+      en-US: SNMP Community
+      ja-JP: SNMPコミュニティ
+    type: text
+    limit: 100
+    required: false
+    placeholder: 'Snmp community for v1 v2c'
+    depend:
+      snmpVersion:
+        - 0
+        - 1
+  # === SNMP v3 专用参数 ===
+  - field: snmp_username
+    name:
+      zh-CN: SNMP 用户名
+      en-US: SNMP Username
+      ja-JP: SNMPユーザー名
+    type: text
+    limit: 50
+    required: false
+    placeholder: 'Snmp username for v3'
+    depend:
+      snmpVersion:
+        - 3
+  - field: contextName
+    name:
+      zh-CN: ContextName
+      en-US: ContextName
+      ja-JP: コンテキスト名
+    type: text
+    limit: 100
+    required: false
+    placeholder: 'ContextName for v3'
+    depend:
+      snmpVersion:
+        - 3
+  - field: authPassphrase
+    name:
+      zh-CN: 认证密码
+      en-US: Auth Password
+      ja-JP: 認証パスワード
+    type: password
+    limit: 100
+    required: false
+    placeholder: 'authNoPriv模式必填'
+    depend:
+      snmpVersion:
+        - 3
+  - field: authPasswordEncryption
+    name:
+      zh-CN: 认证加密方式
+      en-US: Auth Encryption
+      ja-JP: 認証暗号
+    type: radio
+    required: false
+    options:
+      - label: MD5
+        value: 0
+      - label: SHA1
+        value: 1
+    depend:
+      snmpVersion:
+        - 3
+  - field: privPassphrase
+    name:
+      zh-CN: 加密密码
+      en-US: Priv Password
+      ja-JP: パスワードフレーズ
+    type: password
+    limit: 100
+    required: false
+    placeholder: 'authNoPriv模式留空即可'
+    depend:
+      snmpVersion:
+        - 3
+  - field: privPasswordEncryption
+    name:
+      zh-CN: 加密方式
+      en-US: Priv Encryption
+      ja-JP: 暗号化方式
+    type: radio
+    required: false
+    options:
+      - label: DES
+        value: 0
+      - label: AES128
+        value: 1
+    depend:
+      snmpVersion:
+        - 3
+# collect metrics config list
+metrics:
+  # 系统基本信息(可用性检测)
+  - name: basic
+    i18n:
+      zh-CN: 系统基本信息
+      en-US: System Info
+      ja-JP: システム基礎情報
+    priority: 0
+    fields:
+      - field: sysDescr
+        type: 1
+        i18n:
+          zh-CN: 系统描述
+          en-US: System Description
+          ja-JP: システム記述
+      - field: sysUpTime
+        type: 1
+        i18n:
+          zh-CN: 运行时间
+          en-US: Uptime
+          ja-JP: アップタイム
+      - field: sysName
+        type: 1
+        i18n:
+          zh-CN: 主机名称
+          en-US: Host Name
+          ja-JP: ホスト名
+      - field: sysContact
+        type: 1
+        i18n:
+          zh-CN: 联系人
+          en-US: Contact
+          ja-JP: 連絡先
+      - field: sysLocation
+        type: 1
+        i18n:
+          zh-CN: 位置
+          en-US: Location
+          ja-JP: 場所
+      - field: responseTime
+        type: 0
+        unit: ms
+        i18n:
+          zh-CN: 响应时间
+          en-US: Response Time
+          ja-JP: 応答時間
+    protocol: snmp
+    snmp:
+      host: ^_^host^_^
+      port: ^_^port^_^
+      version: ^_^snmpVersion^_^
+      community: ^_^community^_^
+      username: ^_^snmp_username^_^
+      authPassphrase: ^_^authPassphrase^_^
+      authPasswordEncryption: ^_^authPasswordEncryption^_^
+      privPassphrase: ^_^privPassphrase^_^
+      privPasswordEncryption: ^_^privPasswordEncryption^_^
+      contextName: ^_^contextName^_^
+      timeout: ^_^timeout^_^
+      operation: get
+      oids:
+        sysDescr: 1.3.6.1.2.1.1.1.0
+        sysUpTime: 1.3.6.1.2.1.1.3.0
+        sysName: 1.3.6.1.2.1.1.5.0
+        sysContact: 1.3.6.1.2.1.1.4.0
+        sysLocation: 1.3.6.1.2.1.1.6.0
+
+  # CPU 信息
+  - name: cpu
+    i18n:
+      zh-CN: CPU 信息
+      en-US: CPU Info
+      ja-JP: CPU情報
+    priority: 1
+    fields:
+      - field: numCPUs
+        type: 0
+        i18n:
+          zh-CN: CPU数量
+          en-US: Number of CPUs
+          ja-JP: CPU数
+      - field: idle
+        type: 0
+        unit: '%'
+        i18n:
+          zh-CN: 空闲率
+          en-US: Idle
+          ja-JP: アイドル
+      - field: user
+        type: 0
+        unit: '%'
+        i18n:
+          zh-CN: 用户态占用
+          en-US: User
+          ja-JP: ユーザー
+      - field: system
+        type: 0
+        unit: '%'
+        i18n:
+          zh-CN: 内核态占用
+          en-US: System
+          ja-JP: システム
+      - field: responseTime
+        type: 0
+        unit: ms
+        i18n:
+          zh-CN: 响应时间
+          en-US: Response Time
+          ja-JP: 応答時間
+    aliasFields:
+      - numCPUs
+      - idle
+      - user
+      - system
+    calculates:
+      - numCPUs=numCPUs
+      - idle=idle
+      - user=user
+      - system=system
+    protocol: snmp
+    snmp:
+      host: ^_^host^_^
+      port: ^_^port^_^
+      version: ^_^snmpVersion^_^
+      community: ^_^community^_^
+      username: ^_^snmp_username^_^
+      authPassphrase: ^_^authPassphrase^_^
+      authPasswordEncryption: ^_^authPasswordEncryption^_^
+      privPassphrase: ^_^privPassphrase^_^
+      privPasswordEncryption: ^_^privPasswordEncryption^_^
+      contextName: ^_^contextName^_^
+      timeout: ^_^timeout^_^
+      operation: get
+      oids:
+        numCPUs: 1.3.6.1.2.1.25.1.6.0
+        idle: 1.3.6.1.2.1.25.3.3.1.2.196608.0
+        user: 1.3.6.1.2.1.25.3.3.1.2.196609.0
+        system: 1.3.6.1.2.1.25.3.3.1.2.196610.0
+
+  # 内存信息
+  - name: memory
+    i18n:
+      zh-CN: 内存信息
+      en-US: Memory Info
+      ja-JP: メモリ情報
+    priority: 2
+    fields:
+      - field: totalRAM
+        type: 0
+        unit: MB
+        i18n:
+          zh-CN: 总内存
+          en-US: Total RAM
+          ja-JP: 総メモリ
+      - field: freeRAM
+        type: 0
+        unit: MB
+        i18n:
+          zh-CN: 可用内存
+          en-US: Free RAM
+          ja-JP: 空きメモリ
+      - field: totalSwap
+        type: 0
+        unit: MB
+        i18n:
+          zh-CN: 总交换空间
+          en-US: Total Swap
+          ja-JP: 総スワップ
+      - field: freeSwap
+        type: 0
+        unit: MB
+        i18n:
+          zh-CN: 可用交换空间
+          en-US: Free Swap
+          ja-JP: 空きスワップ
+      - field: responseTime
+        type: 0
+        unit: ms
+        i18n:
+          zh-CN: 响应时间
+          en-US: Response Time
+          ja-JP: 応答時間
+    units:
+      - totalRAM=KB->MB
+      - freeRAM=KB->MB
+      - totalSwap=KB->MB
+      - freeSwap=KB->MB
+    aliasFields:
+      - totalRAM
+      - freeRAM
+      - totalSwap
+      - freeSwap
+    calculates:
+      - totalRAM=totalRAM
+      - freeRAM=freeRAM
+      - totalSwap=totalSwap
+      - freeSwap=freeSwap
+    protocol: snmp
+    snmp:
+      host: ^_^host^_^
+      port: ^_^port^_^
+      version: ^_^snmpVersion^_^
+      community: ^_^community^_^
+      username: ^_^snmp_username^_^
+      authPassphrase: ^_^authPassphrase^_^
+      authPasswordEncryption: ^_^authPasswordEncryption^_^
+      privPassphrase: ^_^privPassphrase^_^
+      privPasswordEncryption: ^_^privPasswordEncryption^_^
+      contextName: ^_^contextName^_^
+      timeout: ^_^timeout^_^
+      operation: get
+      oids:
+        totalRAM: 1.3.6.1.2.1.25.2.2.2.0
+        freeRAM: 1.3.6.1.2.1.25.2.2.13.0
+        totalSwap: 1.3.6.1.2.1.25.2.3.4.0
+        freeSwap: 1.3.6.1.2.1.25.2.3.5.0

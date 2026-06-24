@@ -1,0 +1,75 @@
+# ============================================
+# HertzBeat 前后端一键部署
+# 使用方式: docker compose up -d
+# ============================================
+
+version: "3.8"
+
+services:
+  # ========== HertzBeat 后端 ==========
+  hertzbeat-backend:
+    image: apache/hertzbeat:latest
+    container_name: hertzbeat-backend
+    restart: unless-stopped
+    ports:
+      - "1157:1157"
+    environment:
+      # 数据库配置（按需修改）
+      - JAVA_OPTS=-Xms512m -Xmx1024m
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/hertzbeat?useUnicode=true&characterEncoding=utf-8&useSSL=false
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=hertzbeat
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - hertzbeat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1157/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========== MySQL 数据库 ==========
+  mysql:
+    image: mysql:8.0
+    container_name: hertzbeat-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=hertzbeat
+      - MYSQL_DATABASE=hertzbeat
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - hertzbeat-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootphertzbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========== HertzBeat 前端 (Nginx) ==========
+  hertzbeat-frontend:
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile
+    container_name: hertzbeat-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      hertzbeat-backend:
+        condition: service_healthy
+    networks:
+      - hertzbeat-network
+
+volumes:
+  mysql-data:
+
+networks:
+  hertzbeat-network:
+    driver: bridge
