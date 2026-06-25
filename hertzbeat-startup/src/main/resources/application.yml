@@ -94,24 +94,40 @@ spring:
       on-profile: prod
 
   datasource:
-    driver-class-name: org.postgresql.Driver
+    driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: 123456
-    url: jdbc:postgresql://172.16.16.21:15432/hertzbeat
+    url: jdbc:mysql://172.16.16.21:13306/hertzbeat?useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true&useSSL=false
     hikari:
       max-lifetime: 120000
-
   jpa:
     show-sql: false
-    database-platform: org.eclipse.persistence.platform.database.PostgreSQLPlatform
-    database: postgresql
+    database-platform: org.eclipse.persistence.platform.database.MySQLPlatform
+    database: mysql
     properties:
       eclipselink:
         logging:
           level: SEVERE
 
+#  datasource:
+#    driver-class-name: org.postgresql.Driver
+#    username: root
+#    password: 123456
+#    url: jdbc:postgresql://172.16.16.21:15432/hertzbeat
+#    hikari:
+#      max-lifetime: 120000
+
+#  jpa:
+#    show-sql: false
+#    database-platform: org.eclipse.persistence.platform.database.PostgreSQLPlatform
+#    database: postgresql
+#    properties:
+#      eclipselink:
+#        logging:
+#          level: SEVERE
+
   flyway:
-    enabled: false
+    enabled: true
     clean-disabled: true
     baseline-on-migrate: true
     baseline-version: 1
