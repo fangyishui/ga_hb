@@ -3,7 +3,7 @@ name: Build and Push Hertzbeat Docker Image
 on:
   push:
     branches:
-      - main  # 或者你魔改的分支，比如 master、dev
+      - master  # 或者你魔改的分支，比如 master、dev
     tags:
       - 'v*' # 当发布标签如 v1.0.0 时触发
 
