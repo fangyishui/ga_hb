@@ -1,70 +1,67 @@
 name: Build and Push Hertzbeat Docker Image
 
 on:
+  # 1. 支持代码推送到 main 或 master 分支时自动触发 (按需保留)
   push:
     branches:
-      - master  # 或者你魔改的分支，比如 master、dev
-    tags:
-      - 'v*' # 当发布标签如 v1.0.0 时触发
+      - main
+      - master
+  
+  # 2. 支持在 GitHub Actions 页面手动触发，并可自定义镜像版本号
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: '请输入 Docker 镜像标签 (例如: v1.0-offline, latest)'
+        required: true
+        default: 'latest'
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     
-    # 授予向 GitHub Packages 写入镜像的权限
+    # 授予向 GitHub Packages (GHCR) 写入镜像的权限（必填，否则推送失败）
     permissions:
       contents: read
       packages: write
 
     steps:
-      # 1. 检出你的魔改代码
+      # 第一步：拉取你的魔改代码
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. 设置 JDK 环境 (Hertzbeat 通常需要 JDK 17 或以上，根据实际版本调整)
-      - name: Set up JDK
+      # 第二步：设置 Java 环境 (Hertzbeat 默认需要 JDK 17)
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'maven' # 开启 maven 缓存，加速后续构建
+          cache: 'maven' # 开启 Maven 缓存，大幅加快后续构建速度
 
-      # 3. 编译打包 Java 项目 (生成 jar 包或打包好的目录)
-      # 注意：根据 Hertzbeat 官方的构建命令调整，通常是 mvn clean package
+      # 第三步：使用 Maven 编译并打包项目 (跳过单元测试)
       - name: Build with Maven
         run: |
           mvn clean package -Dmaven.test.skip=true
 
-      # 4. 设置 Docker Buildx (用于多架构构建，可选)
+      # 第四步：初始化 Docker 容器构建环境
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 5. 登录到 GitHub Container Registry (GHCR)
+      # 第五步：自动登录到 GitHub 官方的镜像仓库 (GHCR)
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
+          # 使用触发流水线的用户名和 GitHub 自动注入的临时 Token，无需手动配置密码
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 6. 提取 Docker 元数据（标签、版本控制）
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}/hertzbeat
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            latest
-
-      # 7. 构建并推送 Docker 镜像
-      # 注意：context 和 file 路径需要对应你项目中 Dockerfile 的实际位置
+      # 第六步：构建 Docker 镜像并推送
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./script/docker/Dockerfile # 请根据 Hertzbeat 源码中 Dockerfile 的真实路径调整
+          # ⚠️ 关键检查点：请确认这个 Dockerfile 的路径与你项目中的实际路径一致
+          file: ./script/docker/Dockerfile 
           push: true
-          tags: ${{ id.meta.outputs.tags }}
-          labels: ${{ id.meta.outputs.labels }}
+          # 动态标签逻辑：如果是手动触发则使用你输入的标签，如果是推送代码触发则默认使用 latest
+          tags: ghcr.io/${{ github.repository }}/hertzbeat:${{ github.event.inputs.image_tag || 'latest' }}
