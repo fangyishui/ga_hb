@@ -1,13 +1,16 @@
 FROM eclipse-temurin:21-jdk
 
-WORKDIR /opt/hertzbeat
+LABEL maintainer="HertzBeat"
 
-COPY . .
+WORKDIR /app
 
-RUN mvn clean package -DskipTests
+# ✔ 只复制 Maven 产物
+COPY target/*.jar app.jar
 
-RUN cp target/*.jar app.jar
+# JVM启动参数（可选优化）
+ENV JAVA_OPTS=""
 
 EXPOSE 1157 1158
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# ✔ 直接运行 jar
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
