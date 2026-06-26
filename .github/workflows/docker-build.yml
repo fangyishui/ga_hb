@@ -1,28 +1,18 @@
-name: Build and Push Hertzbeat Docker Images
+name: Build Hertzbeat Offline Tar
 
 on:
   push:
     branches:
       - main
       - master
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: '请输入 Docker 镜像标签 (例如: v1.0-offline, latest)'
-        required: true
-        default: 'latest'
+  workflow_dispatch: # 保留手动触发按钮
 
 jobs:
-  build-and-push:
+  build-and-export:
     runs-on: ubuntu-latest
-    
     strategy:
       matrix:
         component: [server, collector]
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout Code
@@ -39,26 +29,26 @@ jobs:
         run: |
           mvn clean package -Dmaven.test.skip=true
 
-      # 👇 【核心新增】在打包前，动态修复 Dockerfile 中的 mkdir 报错
       - name: Patch Dockerfile on the fly
         run: |
-          echo "正在动态修复 ./script/docker/${{ matrix.component }}/Dockerfile 中的 mkdir 问题..."
           sed -i 's|RUN mkdir /var/run/sshd|RUN mkdir -p /var/run/sshd|g' ./script/docker/${{ matrix.component }}/Dockerfile
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and Push Docker Image
+      # 👇 核心改变：构建镜像并直接在本地导出为 tar 包（不推送到仓库，不需要登录）
+      - name: Build and Export to Tar
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./script/docker/${{ matrix.component }}/Dockerfile 
-          push: true
-          tags: ghcr.io/${{ github.repository }}/hertzbeat-${{ matrix.component }}:${{ github.event.inputs.image_tag || 'latest' }}
+          file: ./script/docker/${{ matrix.component }}/Dockerfile
+          tags: hertzbeat-${{ matrix.component }}:latest
+          outputs: type=docker,dest=${{ github.workspace }}/hertzbeat-${{ matrix.component }}.tar
+
+      # 👇 核心改变：将 tar 包上传到 GitHub Actions 页面供直接下载
+      - name: Upload Tar Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hertzbeat-${{ matrix.component }}-offline-tar
+          path: ${{ github.workspace }}/hertzbeat-${{ matrix.component }}.tar
+          retention-days: 7 # 在 GitHub 上保留 7 天
