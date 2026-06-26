@@ -1,27 +1,32 @@
-name: Build Docker Image
+name: Build HertzBeat Docker Image
 
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
-env:
-  IMAGE_NAME: hertzbeat
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # =========================
       # 1. 拉代码
-      # =========================
       - name: Checkout
         uses: actions/checkout@v4
 
-      # =========================
-      # 2. 登录 GHCR
-      # =========================
+      # 2. 安装 JDK
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      # 3. Maven 打包（关键！！！）
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      # 4. 登录 GHCR
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -29,15 +34,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # =========================
-      # 3. Buildx
-      # =========================
+      # 5. Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # =========================
-      # 4. 构建并推送
-      # =========================
+      # 6. 构建并推送镜像
       - name: Build and Push
         uses: docker/build-push-action@v6
         with:
