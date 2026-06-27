@@ -5,7 +5,17 @@ on:
     branches:
       - main
       - master
-  workflow_dispatch: # 保留手动触发按钮
+  workflow_dispatch:
+    inputs:
+      # 👇 新增：让你可以手动选择打包成 x86(amd64) 还是 ARM64 架构
+      target_platform:
+        description: '请选择目标服务器的 CPU 架构'
+        required: true
+        default: 'linux/arm64'
+        type: choice
+        options:
+          - 'linux/arm64'  # 对应你现在的正式服务器 (M1/M2/M3 Mac, 鲲鹏, 飞腾)
+          - 'linux/amd64'  # 对应常规的 Intel/AMD 服务器、PVE 虚拟机
 
 jobs:
   build-and-export:
@@ -36,19 +46,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 👇 核心改变：构建镜像并直接在本地导出为 tar 包（不推送到仓库，不需要登录）
       - name: Build and Export to Tar
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./script/docker/${{ matrix.component }}/Dockerfile
+          # 👇 动态读取你选择的架构 (如果是代码推送触发，默认打 arm64)
+          platforms: ${{ github.event.inputs.target_platform || 'linux/arm64' }}
           tags: hertzbeat-${{ matrix.component }}:latest
           outputs: type=docker,dest=${{ github.workspace }}/hertzbeat-${{ matrix.component }}.tar
 
-      # 👇 核心改变：将 tar 包上传到 GitHub Actions 页面供直接下载
       - name: Upload Tar Artifact
         uses: actions/upload-artifact@v4
         with:
           name: hertzbeat-${{ matrix.component }}-offline-tar
           path: ${{ github.workspace }}/hertzbeat-${{ matrix.component }}.tar
-          retention-days: 7 # 在 GitHub 上保留 7 天
+          retention-days: 7
