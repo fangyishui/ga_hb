@@ -1,64 +1,56 @@
-name: Build Hertzbeat Offline Tar
+name: Build Hertzbeat ARM64 Offline Tar
 
 on:
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
     inputs:
-      # 👇 新增：让你可以手动选择打包成 x86(amd64) 还是 ARM64 架构
       target_platform:
-        description: '请选择目标服务器的 CPU 架构'
-        required: true
+        description: '架构'
         default: 'linux/arm64'
-        type: choice
-        options:
-          - 'linux/arm64'  # 对应你现在的正式服务器 (M1/M2/M3 Mac, 鲲鹏, 飞腾)
-          - 'linux/amd64'  # 对应常规的 Intel/AMD 服务器、PVE 虚拟机
 
 jobs:
   build-and-export:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        component: [server, collector]
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
+        with: {java-version: '17', distribution: 'temurin'}
 
+      # 1. 编译
       - name: Build with Maven
-        run: |
-          mvn clean package -Dmaven.test.skip=true
+        run: mvn clean package -Dmaven.test.skip=true
 
-      - name: Patch Dockerfile on the fly
+      # 2. 【核心修复】将编译产物搬运到 Docker 构建目录
+      - name: Prepare Docker Build Context
         run: |
-          sed -i 's|RUN mkdir /var/run/sshd|RUN mkdir -p /var/run/sshd|g' ./script/docker/${{ matrix.component }}/Dockerfile
+          # 假设你的 Dockerfile 在 ./script/docker/server/
+          # 这里的路径需根据你实际的 jar 包生成位置微调
+          mkdir -p ./script/docker/server/target
+          cp manager/target/hertzbeat-manager-*.jar ./script/docker/server/target/app.jar
+          # 复制启动脚本
+          cp script/bin/entrypoint.sh ./script/docker/server/
 
+      - name: Set up QEMU & Buildx
+        uses: docker/setup-qemu-action@v3
+        with: {platforms: 'arm64'}
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # 3. 打包（注意 context 改为了 Dockerfile 所在目录）
       - name: Build and Export to Tar
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./script/docker/${{ matrix.component }}/Dockerfile
-          # 👇 动态读取你选择的架构 (如果是代码推送触发，默认打 arm64)
-          platforms: ${{ github.event.inputs.target_platform || 'linux/arm64' }}
-          tags: hertzbeat-${{ matrix.component }}:latest
-          outputs: type=docker,dest=${{ github.workspace }}/hertzbeat-${{ matrix.component }}.tar
+          context: ./script/docker/server/
+          file: ./script/docker/server/Dockerfile
+          platforms: linux/arm64
+          tags: hertzbeat-server:arm64
+          outputs: type=docker,dest=${{ github.workspace }}/hertzbeat-server-arm64.tar
 
-      - name: Upload Tar Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hertzbeat-${{ matrix.component }}-offline-tar
-          path: ${{ github.workspace }}/hertzbeat-${{ matrix.component }}.tar
-          retention-days: 7
+          name: hertzbeat-server-arm64
+          path: hertzbeat-server-arm64.tar
