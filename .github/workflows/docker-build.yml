@@ -1,56 +1,79 @@
-name: Build Hertzbeat ARM64 Offline Tar
+name: Build Hertzbeat Offline Tar (Multi-Arch)
 
 on:
-  workflow_dispatch:
-    inputs:
-      target_platform:
-        description: '架构'
-        default: 'linux/arm64'
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # 依然支持手动点击运行
 
 jobs:
   build-and-export:
     runs-on: ubuntu-latest
+    strategy:
+      # 矩阵配置：同时并行打 x86(amd64) 和 ARM(arm64) 两个架构的包
+      matrix:
+        component: [server]  # 目前先集中精力解决 server 端
+        arch: [amd64, arm64]
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
-        with: {java-version: '17', distribution: 'temurin'}
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
 
-      # 1. 编译
       - name: Build with Maven
         run: mvn clean package -Dmaven.test.skip=true
 
-      # 2. 【核心修复】将编译产物搬运到 Docker 构建目录
-      - name: Prepare Docker Build Context
+      - name: Prepare Docker Context (自动寻宝搬运)
         run: |
-          # 假设你的 Dockerfile 在 ./script/docker/server/
-          # 这里的路径需根据你实际的 jar 包生成位置微调
-          mkdir -p ./script/docker/server/target
-          cp manager/target/hertzbeat-manager-*.jar ./script/docker/server/target/app.jar
-          # 复制启动脚本
-          cp script/bin/entrypoint.sh ./script/docker/server/
+          echo "==== 开始准备 Docker 构建上下文 ===="
+          CONTEXT_DIR="./script/docker/${{ matrix.component }}"
+          mkdir -p $CONTEXT_DIR/target
+          
+          # 1. 递归查找并精准搬运 Jar 包 (排除 original 的精简包)
+          JAR_PATH=$(find . -type f -name "hertzbeat-${{ matrix.component }}-*.jar" | grep -v "original" | head -n 1)
+          if [ -z "$JAR_PATH" ]; then echo "❌ 致命错误：找不到 jar 包！" && exit 1; fi
+          echo "✅ 找到 Jar 包: $JAR_PATH"
+          cp "$JAR_PATH" $CONTEXT_DIR/target/app.jar
+          
+          # 2. 递归查找并搬运启动脚本
+          SCRIPT_PATH=$(find . -type f -name "entrypoint.sh" | head -n 1)
+          if [ -z "$SCRIPT_PATH" ]; then echo "❌ 致命错误：找不到 entrypoint.sh！" && exit 1; fi
+          echo "✅ 找到启动脚本: $SCRIPT_PATH"
+          cp "$SCRIPT_PATH" $CONTEXT_DIR/entrypoint.sh
+          
+          # 3. 修正 SSH 目录创建语法 (针对源 Dockerfile 的修复)
+          sed -i 's|RUN mkdir /var/run/sshd|RUN mkdir -p /var/run/sshd|g' $CONTEXT_DIR/Dockerfile || true
+          echo "==== 准备完毕 ===="
 
-      - name: Set up QEMU & Buildx
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        with: {platforms: 'arm64'}
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. 打包（注意 context 改为了 Dockerfile 所在目录）
       - name: Build and Export to Tar
         uses: docker/build-push-action@v5
         with:
-          context: ./script/docker/server/
-          file: ./script/docker/server/Dockerfile
-          platforms: linux/arm64
-          tags: hertzbeat-server:arm64
-          outputs: type=docker,dest=${{ github.workspace }}/hertzbeat-server-arm64.tar
+          # 上下文严格锁定为 Dockerfile 所在的目录，此时 jar 和脚本已经被搬运到这里了
+          context: ./script/docker/${{ matrix.component }}
+          file: ./script/docker/${{ matrix.component }}/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          # 标签明确区分架构： hertzbeat-server:arm64 或 hertzbeat-server:amd64
+          tags: hertzbeat-${{ matrix.component }}:${{ matrix.arch }}
+          # 导出为 tar
+          outputs: type=docker,dest=${{ github.workspace }}/hertzbeat-${{ matrix.component }}-${{ matrix.arch }}.tar
 
-      - name: Upload Artifact
+      - name: Upload Tar Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hertzbeat-server-arm64
-          path: hertzbeat-server-arm64.tar
+          # 生成的压缩包名称明确标注架构，方便下载
+          name: hertzbeat-${{ matrix.component }}-${{ matrix.arch }}-offline-tar
+          path: ${{ github.workspace }}/hertzbeat-${{ matrix.component }}-${{ matrix.arch }}.tar
+          retention-days: 7
