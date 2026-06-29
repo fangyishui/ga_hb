@@ -30,25 +30,34 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -Dmaven.test.skip=true
 
+      # 👇 这里帮你重新对齐了缩进
       - name: Prepare Docker Context (自动寻宝搬运)
         run: |
           echo "==== 开始准备 Docker 构建上下文 ===="
           CONTEXT_DIR="./script/docker/${{ matrix.component }}"
           mkdir -p $CONTEXT_DIR/target
           
-          # 1. 递归查找并精准搬运 Jar 包 (排除 original 的精简包)
-          JAR_PATH=$(find . -type f -name "hertzbeat-${{ matrix.component }}-*.jar" | grep -v "original" | head -n 1)
-          if [ -z "$JAR_PATH" ]; then echo "❌ 致命错误：找不到 jar 包！" && exit 1; fi
+          # 1. 扩大搜索范围：同时匹配 manager 或 server，并排除多余的依赖包
+          JAR_PATH=$(find . -type f -name "*.jar" | grep -iE "manager|server" | grep -v "original" | grep -v "sources" | head -n 1)
+          
+          # 增加调试信息：如果没找到，就把所有打出来的 jar 包名字全打印出来给我们看
+          if [ -z "$JAR_PATH" ]; then 
+            echo "❌ 致命错误：找不到 jar 包！"
+            echo "--- 以下是系统实际生成的所有 Jar 包 ---"
+            find . -name "*.jar"
+            exit 1
+          fi
+          
           echo "✅ 找到 Jar 包: $JAR_PATH"
           cp "$JAR_PATH" $CONTEXT_DIR/target/app.jar
           
-          # 2. 递归查找并搬运启动脚本
+          # 2. 查找启动脚本
           SCRIPT_PATH=$(find . -type f -name "entrypoint.sh" | head -n 1)
           if [ -z "$SCRIPT_PATH" ]; then echo "❌ 致命错误：找不到 entrypoint.sh！" && exit 1; fi
           echo "✅ 找到启动脚本: $SCRIPT_PATH"
           cp "$SCRIPT_PATH" $CONTEXT_DIR/entrypoint.sh
           
-          # 3. 修正 SSH 目录创建语法 (针对源 Dockerfile 的修复)
+          # 3. 修正 SSH 目录创建语法
           sed -i 's|RUN mkdir /var/run/sshd|RUN mkdir -p /var/run/sshd|g' $CONTEXT_DIR/Dockerfile || true
           echo "==== 准备完毕 ===="
 
